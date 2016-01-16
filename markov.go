@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"path"
 	"strings"
+	//"github.com/mattn/go-sqlite3"
 )
 
 const markov_order = 3
@@ -83,16 +84,20 @@ func list_corpus(folder_path string) []string {
 // Replace punctuation marks with a space before so field can
 // interpret it as a separate entity.
 func replace_punctuation(text string) string {
-	lookup := make(map[string]string)
-	lookup["."] = " ."
-	lookup[","] = " ,"
-	lookup[";"] = " ;"
-	lookup[":"] = " :"
-	lookup["!"] = " !"
-	lookup["?"] = " ?"
-	lookup["\n"] = ""
-	lookup["\t"] = ""
-	lookup["\r"] = ""
+	lookup := map[string]string{
+		"." : " . ",
+		"," : " , ",
+		":" : " : ",
+		";" : " ; ",
+		"!" : " ! ",
+		"?" : " ? ",
+		"\n" : " ",
+		"\t" : " ",
+		"\r" : " ",
+		"--" : " -- ",
+		"(" : " ( ",
+		")" : " ) ",
+	}
 
 	var new_str string = text
 	for punct, repl := range lookup {
@@ -100,3 +105,16 @@ func replace_punctuation(text string) string {
 	}
 	return new_str
 }
+
+//Save to database
+func dbase_saver(map[string][markov_order]string) bool {
+	select {
+	default :
+	}
+	return true
+}
+
+
+
+
+
