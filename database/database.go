@@ -15,7 +15,7 @@ func check(err error){
 }
 
 // Execute a sql statement
-func Execute(statement string) {
+func ExecuteStatement(statement string) {
 	db, err := sql.Open("sqlite3", "./database/db.sqlite3")
 	check(err)
 	defer db.Close()
@@ -27,6 +27,22 @@ func Execute(statement string) {
 		log.Printf("%q: %s\n", err, sqlStmt)
 		return
 	}
+}
+
+func ExecuteTransaction(data []string) {
+	db, err := sql.Open("sqlite3", "./database/db.sqlite3")
+	tx, err := db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, stmt := range data {
+		_, err = tx.Exec(stmt)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	tx.Commit()
 }
 
 // Generate script to initialize database table for variable markov order.
@@ -42,21 +58,6 @@ func InitDB(markov_order int) {
 		variable_columns += col_name
 	}
 	stmt = fmt.Sprintf(stmt, variable_columns)
-	Execute(stmt)
+	ExecuteStatement(stmt)
 }
 
-// Generate insert statements without values.
-func GenInsert(markov_order int) string {
-	stmt := `INSERT INTO markov (target, %s) VALUES `
-	var variable_columns string
-	var col_name string
-	for i := 0; i < markov_order; i++{
-		col_name = "targetminus" + strconv.Itoa(markov_order - i)
-		if i != markov_order - 1 {
-			col_name += ", "
-		}
-		variable_columns += col_name
-	}
-	stmt = fmt.Sprintf(stmt, variable_columns)
-	return stmt
-}

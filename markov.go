@@ -7,12 +7,12 @@ import (
 	"strings"
 	db "github.com/patleeman/Go_Markov/database"
 	"time"
+	"strconv"
 )
 
 const markov_order = 3
 const corpus_dir = "./text_corpus"
 
-// TODO: Fix scan_text data storage schema.  Need to nest map inside a slice in order to not overwrite keys or organize it differently.
 
 func main() {
 	start := time.Now()
@@ -33,36 +33,34 @@ func main() {
 
 // Scan text files inside corpus folder and return a slice with maps of schema:
 // map[word : [word -n, ..., word -2, word -1]]
-func scan_text() map[string][markov_order]string {
+func scan_text() [][markov_order+1]string {
 	// Grab all text files from text corpus folder
 	file_list := list_corpus(corpus_dir)
 
-	// Grab contents from file
-
-	// map with a string type key with a markov_order sized string array
-	var word_map = make(map[string][markov_order]string)
-
+	// Create a fixed length array of size markov_order + 1
+	// Data := [word, word-1, word-2, ..., word-n]
+	all_words := [][markov_order+1]string{}
 	for _, f := range file_list {
 		file_contents := grab_contents(f)
 		punct_cleaned := replace_punctuation(file_contents)
 		words := strings.Fields(punct_cleaned)
 
 		for index, word := range words {
-
-			var prior_words [markov_order]string
+			var word_set [markov_order+1]string
+			word_set[0] = word
 			if index <= markov_order {
 				continue
 			} else {
 				for i := 0; i < markov_order ; i++ {
 					word_index := index - (markov_order - i)
-					prior_words[i] = words[word_index]
-					word_map[word] = prior_words
+					word_set[i+1] = words[word_index]
 				}
 			}
-			fmt.Println(index, " ", word, " ",  prior_words)
+			all_words = append(all_words, word_set)
+			fmt.Println(index, " ",  word_set)
 		}
 	}
-	return word_map
+	return all_words
 }
 
 // grab_contents takes a file path for a text file and returns
@@ -126,28 +124,42 @@ func replace_punctuation(text string) string {
 	return new_str
 }
 
-func save_to_db(word_dict map[string][markov_order]string) {
+// Generate the rest of the insert statement.  Base statement generated with GenInsert.
+func save_to_db(values [][markov_order+1]string) {
 	// Generate values statement i.e.
 	// INSERT INTO markov (target, wordminus1) VALUES (xxxxxxxxxx)
-	base_statement := db.GenInsert(markov_order) + " ("
+	base_statement := GenInsert(markov_order) + " ("
 	var value_stmt string
-	for target := range word_dict {
+	var all_statements []string
+	for _, word_set := range values {
 		value_stmt = ""
-		value_stmt += "'" + target + "', "
+		for index, word := range word_set {
+			value_stmt += "'" + word + "'"
 
-		data_values := word_dict[target]
-		for index, nth_order_word := range data_values {
-
-			value_stmt += "'" + nth_order_word + "'"
-
-			if index != markov_order - 1 {
+			if index != markov_order {
 				value_stmt += ", "
 			} else {
 				value_stmt += ")"
 			}
 		}
 		full_stmt := base_statement + value_stmt
-		db.Execute(full_stmt)
+		all_statements = append(all_statements, full_stmt)
 	}
+	db.ExecuteTransaction(all_statements)
 }
 
+// Generate insert statements without values.
+func GenInsert(markov_order int) string {
+	stmt := `INSERT INTO markov (target, %s) VALUES `
+	var variable_columns string
+	var col_name string
+	for i := 0; i < markov_order; i++{
+		col_name = "targetminus" + strconv.Itoa(markov_order - i)
+		if i != markov_order - 1 {
+			col_name += ", "
+		}
+		variable_columns += col_name
+	}
+	stmt = fmt.Sprintf(stmt, variable_columns)
+	return stmt
+}
