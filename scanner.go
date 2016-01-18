@@ -17,7 +17,7 @@ const corpus_dir = "./text_corpus"
 func main() {
 	start := time.Now()
 	// Initialize Database
-	db.InitDB(markov_order)
+	InitDB(markov_order)
 
 	// Scan Text
 	fmt.Println("Scanning files in corpus directory.")
@@ -46,6 +46,7 @@ func scan_text() [][markov_order+1]string {
 		words := strings.Fields(punct_cleaned)
 
 		for index, word := range words {
+
 			var word_set [markov_order+1]string
 			word_set[0] = word
 			if index <= markov_order {
@@ -133,6 +134,10 @@ func save_to_db(values [][markov_order+1]string) {
 	for _, word_set := range values {
 		value_stmt = ""
 		for index, word := range word_set {
+			if len(word) < 1 {
+				continue
+			}
+
 			value_stmt += "'" + word + "'"
 
 			if index != markov_order {
@@ -162,3 +167,20 @@ func GenInsert(markov_order int) string {
 	stmt = fmt.Sprintf(stmt, variable_columns)
 	return stmt
 }
+
+// Generate script to initialize database table for variable markov order.
+func InitDB(markov_order int) {
+	stmt := `DROP TABLE IF EXISTS markov; CREATE TABLE markov (m_id INTEGER PRIMARY KEY, target TEXT, %s);`
+	var variable_columns string
+	var col_name string
+	for i := 0; i < markov_order; i++{
+		col_name = "targetminus" + strconv.Itoa(markov_order - i) + " TEXT"
+		if i != markov_order - 1 {
+			col_name += ", "
+		}
+		variable_columns += col_name
+	}
+	stmt = fmt.Sprintf(stmt, variable_columns)
+	db.ExecuteStatement(stmt)
+}
+

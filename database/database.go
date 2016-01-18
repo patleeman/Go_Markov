@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
-	"strconv"
+	"strings"
 	"fmt"
 )
 
@@ -31,33 +31,43 @@ func ExecuteStatement(statement string) {
 
 func ExecuteTransaction(data []string) {
 	db, err := sql.Open("sqlite3", "./database/db.sqlite3")
+	check(err)
 	tx, err := db.Begin()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	for _, stmt := range data {
+		fmt.Println(stmt)
 		_, err = tx.Exec(stmt)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal(err, " Statement: ", stmt)
 		}
 	}
 	tx.Commit()
 }
 
-// Generate script to initialize database table for variable markov order.
-func InitDB(markov_order int) {
-	stmt := `DROP TABLE IF EXISTS markov; CREATE TABLE markov (m_id INTEGER PRIMARY KEY, target TEXT, %s);`
-	var variable_columns string
-	var col_name string
-	for i := 0; i < markov_order; i++{
-		col_name = "targetminus" + strconv.Itoa(markov_order - i) + " TEXT"
-		if i != markov_order - 1 {
-			col_name += ", "
-		}
-		variable_columns += col_name
-	}
-	stmt = fmt.Sprintf(stmt, variable_columns)
-	ExecuteStatement(stmt)
-}
+func Query(statement string, markov_order int) []string {
+	// Open db
+	db, err := sql.Open("sqlite3", "./database/db.sqlite3")
+	check(err)
 
+	rows, err := db.Query(statement)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	var options []string
+	for rows.Next() {
+		var target string
+		rows.Scan(&target)
+
+		if strings.Contains(target, "'"){
+			target = strings.Replace(target, "'", "/'", -1)
+		}
+
+		options = append(options, target)
+	}
+	return options
+}
