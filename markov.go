@@ -57,7 +57,6 @@ func scan_text() [][markov_order+1]string {
 				}
 			}
 			all_words = append(all_words, word_set)
-			fmt.Println(index, " ",  word_set)
 		}
 	}
 	return all_words
